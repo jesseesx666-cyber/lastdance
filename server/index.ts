@@ -2,6 +2,7 @@ import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import { createApp } from './app'
+import { createMysqlPool, createMysqlStore } from './mysql'
 import { createStore } from './store'
 
 const root = path.resolve(import.meta.dirname, '..')
@@ -12,10 +13,13 @@ if (fs.existsSync(envFile))
     const m = /^\s*([A-Z_]+)\s*=\s*(.*?)\s*$/.exec(line)
     if (m && process.env[m[1]] === undefined) process.env[m[1]] = m[2]
   }
-const { SHEET_URL, SHEET_TOKEN } = process.env
+const { SHEET_URL, SHEET_TOKEN, DATABASE_URL } = process.env
 const dataDir = process.env.DATA_DIR ?? path.join(root, 'data')
-const store = createStore(dataDir, SHEET_URL && SHEET_TOKEN ? { url: SHEET_URL, token: SHEET_TOKEN } : undefined)
-await store.read() // buat workbook awal bila belum ada
+// DATABASE_URL diisi → MySQL. Bila tidak, tetap jalan dengan Google Sheets / workbook lokal.
+const store = DATABASE_URL
+  ? createMysqlStore(createMysqlPool(DATABASE_URL, process.env.DATABASE_SSL === '1'), { dir: dataDir })
+  : createStore(dataDir, SHEET_URL && SHEET_TOKEN ? { url: SHEET_URL, token: SHEET_TOKEN } : undefined)
+await store.read() // buat workbook awal bila belum ada / pastikan database bisa dihubungi
 
 // Kunci penanda sesi login: dari SESSION_SECRET, atau dibuat sekali dan disimpan di folder data.
 const secretFile = path.join(dataDir, '.session_secret')

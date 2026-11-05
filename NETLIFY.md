@@ -1,13 +1,15 @@
 # Deploy ke Netlify
 
-Data tetap di Google Sheets; gambar disimpan di Netlify Blobs (otomatis, tanpa setup).
+Data disimpan di MySQL (lihat `README-SQL.md`); gambar di Netlify Blobs (otomatis, tanpa setup).
+Mode Google Sheets lama masih bisa dipakai bila `DATABASE_URL` tidak diisi (`SHEET_URL` + `SHEET_TOKEN`).
 
 1. Jalankan `npm run pack:netlify` (hasilnya folder `netlify-deploy`, sudah termasuk API yang di-bundle).
    Lalu di Netlify: **Add new site > Deploy manually**, drag folder `netlify-deploy` ke halaman itu.
    Setiap ada perubahan kode: jalankan lagi perintah itu dan drag ulang (di tab **Deploys** situs yang sama).
 2. **Site configuration > Environment variables**, isi:
-   - `SHEET_URL`  : URL web app Apps Script (sama dengan di `.env`)
-   - `SHEET_TOKEN`: token yang sama dengan Script Property `TOKEN`
+   - `DATABASE_URL` : connection string MySQL (mis. `mysql://user:pass@host:3306/lastdance`), atau
+     `SHEET_URL` + `SHEET_TOKEN` bila masih memakai Google Sheets
+   - `DATABASE_SSL` : `1` bila penyedia database mewajibkan SSL
    - `SESSION_SECRET`: teks acak panjang (mis. 64 karakter), jangan dibagikan
 3. Setelah mengisi variable, deploy ulang (drag lagi folder yang sama). Buka situs, login dengan akun yang sudah ada di sheet.
 4. Pindahkan 4 gambar lama (sekali saja), setelah situs ada:

@@ -6,7 +6,6 @@ data
 .netlify
 netlify-deploy
 netlify.env
-netlify/seed-thumbs.json
 
 scripts-upload-thumbs.tmp
 .claude

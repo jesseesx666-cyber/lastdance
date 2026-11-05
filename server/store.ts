@@ -52,7 +52,7 @@ export class StoreError extends Error {
 
 const FILE_NAME = 'instagram_analytics.xlsx'
 
-const HEADERS = {
+export const HEADERS = {
   Reports: ['report_id', 'period_start', 'period_end', 'recorded_at', 'notes', 'status', 'account', 'audience_json', 'platform'],
   Metrics: ['report_id', 'metric_key', 'metric_type', 'value', 'unit', 'snapshot_date'],
   Settings: ['key', 'value', 'updated_at'],
@@ -108,10 +108,10 @@ const friendly = (e: unknown): StoreError => {
 
 
 type Cell = ExcelJS.CellValue
-const emptyData = (): Data => ({ reports: [], settings: { account_name: '', instagram_handle: '' }, audit: [], contents: [], users: [], summary: [], activities: [], influencers: [], ads: [], reservations: [], maps: [], web: [], wa: [] })
+export const emptyData = (): Data => ({ reports: [], settings: { account_name: '', instagram_handle: '' }, audit: [], contents: [], users: [], summary: [], activities: [], influencers: [], ads: [], reservations: [], maps: [], web: [], wa: [] })
 
 /** Baris data (tanpa header) per sheet -> Data. Dipakai untuk workbook lokal maupun Google Sheets. */
-function fromSheets(rows: (name: string) => Cell[][]): Data {
+export function fromSheets(rows: (name: string) => Cell[][]): Data {
     const reports = new Map<string, Report>()
     for (const r of rows('Reports')) {
       const id = cellText(r[0])
@@ -191,7 +191,7 @@ function fromSheets(rows: (name: string) => Cell[][]): Data {
 }
 
 /** Data -> baris per sheet (tanpa header). */
-function toSheets(data: Data): Record<keyof typeof HEADERS, unknown[][]> {
+export function toSheets(data: Data): Record<keyof typeof HEADERS, unknown[][]> {
   const now = new Date().toISOString()
   return {
     Reports: data.reports.map((r) => [r.report_id, r.period_start, r.period_end, r.recorded_at, r.notes, r.status, r.account, hasAudience(r.audience) ? JSON.stringify(r.audience) : '', r.platform]),
@@ -311,7 +311,13 @@ export function createStore(dir: string, remote?: Remote, blobs?: ThumbBackend) 
   }
   // Isi tiap sheet terakhir yang diketahui sama dengan Google Sheets; hanya sheet yang berubah yang dikirim (lebih cepat, aman untuk batas waktu hosting).
   let sent: Record<string, string> = {}
-  const snapshot = (data: Data) => Object.fromEntries(Object.entries(toSheets(data)).map(([n, r]) => [n, JSON.stringify(r)]))
+  // Settings diberi stempel waktu saat diserialisasi, jadi yang dibandingkan hanya key/value:
+  // tanpa ini sheet Settings dianggap berubah di setiap penyimpanan (dan tes jadi bergantung waktu).
+  const snapshot = (data: Data) =>
+    Object.fromEntries(Object.entries(toSheets(data)).map(([n, r]) => [
+      n,
+      JSON.stringify(n === 'Settings' ? (r as unknown[][]).map(([k, v]) => [k, v]) : r),
+    ]))
   async function writeRemote(data: Data) {
     const rows = toSheets(data)
     const now = snapshot(data)
@@ -328,6 +334,7 @@ export function createStore(dir: string, remote?: Remote, blobs?: ThumbBackend) 
   let inflight: Promise<unknown> | null = null
   const load = () => (remote ? readRemote() : readLocal())
   const persist = (d: Data) => (remote ? writeRemote(d) : write(d))
+  const thumbs = createThumbs(dir, blobs)
   async function read(): Promise<Data> {
     if (!remote) return readLocal()
     if (!cache || Date.now() - cache.at > TTL) {
@@ -359,6 +366,14 @@ export function createStore(dir: string, remote?: Remote, blobs?: ThumbBackend) 
       await build(await load(), out)
       return out
     },
+    ...thumbs,
+  }
+}
+
+/** Penyimpanan gambar (disk lokal atau backend lain seperti Netlify Blobs), dipakai bersama oleh store mana pun. */
+export function createThumbs(dir: string, blobs?: ThumbBackend) {
+  const thumbDir = path.join(dir, 'thumbs')
+  return {
     thumbDir,
     /** Simpan unggahan gambar sampul (streaming) dengan batas ukuran; file sebagian dihapus bila gagal. */
     async saveThumb(name: string, src: Readable, max: number) {

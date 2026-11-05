@@ -1,0 +1,167 @@
+@import "tailwindcss";
+
+/* Tema terang = palet bawaan Tailwind. Tema gelap (gaya aplikasi finance: latar hitam,
+   aksen lime dan ungu) memetakan ulang skala warna saat <html data-theme="dark">,
+   sehingga seluruh komponen ikut berganti tanpa kelas tambahan. */
+html[data-theme='dark'] {
+  --color-white: #232326;       /* permukaan kartu */
+  --color-slate-50: #161618;    /* latar halaman */
+  --color-slate-100: #2c2c31;
+  --color-slate-200: #35353b;
+  --color-slate-300: #4a4a52;
+  --color-slate-400: #7c7c86;
+  --color-slate-500: #9b9ba5;
+  --color-slate-600: #b6b6bf;
+  --color-slate-700: #d2d2d8;
+  --color-slate-800: #ececf0;
+  --color-slate-900: #f6f6f8;
+
+  --color-indigo-50: #2b3311;   /* sorotan lime redup */
+  --color-indigo-600: #c8f23d;  /* aksen utama (lime) */
+  --color-indigo-700: #bde02e;
+  --color-indigo-900: #dcff62;
+
+  --color-red-50: #3a1e22;
+  --color-red-300: #7a3a40;
+  --color-red-700: #ff8a90;
+  --color-red-800: #ffb3b7;
+  --color-emerald-100: #1d3a2a;
+  --color-emerald-700: #5be394;
+  --color-emerald-800: #8ff0b6;
+  --color-amber-50: #3a301a;
+  --color-amber-300: #7a6528;
+  --color-amber-700: #f5c451;
+  --color-amber-900: #ffd978;
+  --color-sky-50: #1b2f3d;
+  --color-sky-300: #2f5f7a;
+  --color-sky-900: #9bd3f0;
+}
+
+html[data-theme='dark'] { color-scheme: dark; }
+html[data-theme='light'] { color-scheme: light; }
+body { @apply bg-slate-50 text-slate-800 antialiased transition-colors; }
+input, select, textarea { @apply w-full rounded-md border border-slate-300 bg-white/85 px-2.5 py-1.5 text-sm; }
+input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, a:focus-visible { @apply outline-2 outline-offset-1 outline-indigo-600; }
+
+/* Kartu semi-solid: hanya sedikit efek kaca supaya teks di dalamnya tetap jelas. */
+.glass {
+  background: color-mix(in srgb, var(--color-white) 86%, transparent);
+  border: 1px solid rgb(255 255 255 / 0.09);
+  box-shadow: 0 6px 20px -8px rgb(0 0 0 / 0.5);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  backdrop-filter: blur(14px) saturate(1.3);
+}
+/* Tema terang: latar dibuat lebih redup agar kartu putih terlihat jelas. */
+html[data-theme='light'] { --color-slate-50: #d3d9e6; }
+html[data-theme='light'] .glass {
+  background: color-mix(in srgb, #fff 90%, transparent);
+  border-color: rgb(15 23 42 / 0.08);
+  box-shadow: 0 6px 20px -8px rgb(30 41 90 / 0.35);
+}
+/* Mode hemat/mati: tanpa blur (paling berat bagi GPU lemah), hampir solid. */
+html[data-fx='lite'] .glass,
+html[data-fx='off'] .glass {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: color-mix(in srgb, var(--color-white) 95%, transparent);
+}
+html[data-theme='light'][data-fx='lite'] .glass,
+html[data-theme='light'][data-fx='off'] .glass {
+  background: color-mix(in srgb, #fff 96%, transparent);
+}
+
+/* Wadah per judul dashboard: panel tipis di belakang kartu-kartunya (tanpa blur, agar kartu kaca di dalamnya tetap ringan). */
+.panel {
+  border-radius: 1.75rem;
+  background: color-mix(in srgb, var(--color-white) 42%, transparent);
+  border: 1px solid rgb(255 255 255 / 0.1);
+}
+html[data-theme='light'] .panel {
+  background: color-mix(in srgb, #fff 45%, transparent);
+  border-color: rgb(15 23 42 / 0.1);
+}
+html[data-fx='lite'] .panel,
+html[data-fx='off'] .panel {
+  background: color-mix(in srgb, var(--color-white) 80%, transparent);
+}
+html[data-theme='light'][data-fx='lite'] .panel,
+html[data-theme='light'][data-fx='off'] .panel {
+  background: color-mix(in srgb, #fff 82%, transparent);
+}
+
+/* Tombol ganti tema */
+.toggleSwitch {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  position: relative;
+  cursor: pointer;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: none;
+  transition: transform 0.2s ease;
+}
+.toggleSwitch:active { transform: scale(0.94); }
+.toggleSwitch .icon {
+  grid-area: 1 / 1;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  pointer-events: none;
+  transform-origin: center;
+  transition: transform 500ms ease, opacity 300ms ease;
+  transform: rotate(0deg) scale(0);
+  opacity: 0;
+}
+.toggleSwitch .icon--moon { color: #212121; background-color: #e8e8e8; }
+.toggleSwitch .icon--sun { color: #e8e8e8; background-color: #212121; }
+.toggleSwitch[data-dark='true'] .icon--moon { transform: rotate(360deg) scale(1); opacity: 1; }
+.toggleSwitch[data-dark='false'] .icon--sun { transform: rotate(360deg) scale(1); opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .toggleSwitch, .toggleSwitch .icon { transition: none; }
+}
+
+/* Judul fieldset kartu: letakkan di dalam kartu (bawaan browser menempatkannya menimpa garis tepi dan tak terbaca di atas latar). */
+fieldset.glass > legend {
+  float: left;
+  width: 100%;
+  grid-column: 1 / -1;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  font-size: 0.95rem;
+}
+fieldset.glass > legend + * { clear: both; }
+
+/* Tombol ikon minimalis (Edit/Hapus): bulat kecil, melebar menampilkan label saat disorot. */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  height: 2rem;
+  padding: 0 0.5rem;
+  border-radius: 999px;
+  border: 1px solid rgb(148 163 184 / 0.45);
+  background: color-mix(in srgb, var(--color-white) 90%, transparent);
+  color: inherit;
+  cursor: pointer;
+  overflow: hidden;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+}
+.icon-btn svg { flex: none; }
+.icon-btn span {
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 0.75rem;
+  font-weight: 600;
+  transition: max-width 0.2s, opacity 0.2s, margin 0.2s;
+}
+.icon-btn:hover span,
+.icon-btn:focus-visible span { max-width: 8rem; opacity: 1; margin-left: 0.4rem; }
+.icon-btn-edit:hover, .icon-btn-edit:focus-visible { background: #4f46e5; border-color: #4f46e5; color: #fff; }
+.icon-btn-delete:hover, .icon-btn-delete:focus-visible { background: #dc2626; border-color: #dc2626; color: #fff; }

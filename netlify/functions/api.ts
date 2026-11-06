@@ -1,11 +1,14 @@
 import { connectLambda, getStore } from '@netlify/blobs'
 import serverless from 'serverless-http'
-import seed from '../seed-thumbs.json'
 import { createApp } from '../../server/app'
 import { createStore } from '../../server/store'
 
 const { SHEET_URL, SHEET_TOKEN, SESSION_SECRET } = process.env
 if (!SHEET_URL || !SHEET_TOKEN || !SESSION_SECRET) throw new Error('Isi environment variable SHEET_URL, SHEET_TOKEN, dan SESSION_SECRET di Netlify.')
+
+// File ini dibuat oleh `npm run pack:netlify` (tidak ada di repo); bila tidak ada, gambar hanya dari Blobs.
+let seed: Record<string, string> = {}
+try { seed = require('../seed-thumbs.json') } catch { /* tidak ada seed */ }
 
 const images = () => getStore('thumbs') // dibuat saat dipakai: konfigurasi Blobs baru tersedia dalam permintaan
 const store = createStore('/tmp/data', { url: SHEET_URL, token: SHEET_TOKEN }, {
@@ -13,7 +16,7 @@ const store = createStore('/tmp/data', { url: SHEET_URL, token: SHEET_TOKEN }, {
   // Gambar lama ikut terbundel di seed-thumbs.json (dari data/thumbs); gambar baru ada di Blobs.
   get: async (k) => {
     const b = await Promise.resolve().then(() => images().get(k, { type: 'arrayBuffer' })).catch(() => null)
-    const old = (seed as Record<string, string>)[k]
+    const old = seed[k]
     return b ? Buffer.from(b) : old ? Buffer.from(old, 'base64') : null
   },
   delete: (k) => images().delete(k),

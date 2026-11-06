@@ -30,8 +30,9 @@ const secret = process.env.SESSION_SECRET ?? (fs.existsSync(secretFile) ? fs.rea
 })())
 
 const port = Number(process.env.PORT ?? 3001)
-// Hanya loopback: API tidak terbuka ke jaringan.
-createApp(store, path.join(root, 'dist'), secret).listen(port, '127.0.0.1', () => {
-  console.log(`Instagram Analytics Dashboard: http://localhost:${port}`)
+// Default hanya loopback (lokal). Di VPS di belakang nginx: HOST=127.0.0.1 tetap, tambah ALLOW_ANY_HOST=1 agar nama domain diterima.
+const host = process.env.HOST ?? '127.0.0.1'
+createApp(store, path.join(root, 'dist'), secret, process.env.ALLOW_ANY_HOST === '1').listen(port, host, () => {
+  console.log(`Instagram Analytics Dashboard: http://${host === '0.0.0.0' ? 'localhost' : host}:${port}`)
   console.log(`Database: ${store.file}`)
 })

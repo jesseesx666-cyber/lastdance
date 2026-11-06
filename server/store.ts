@@ -77,10 +77,10 @@ const cellText = (v: ExcelJS.CellValue): string => {
 }
 /** Kolom akun kosong/tak dikenal (workbook dari sebelum multi-akun) = Homecare. */
 /** Kolom platform kosong/tak dikenal (data sebelum ada pilihan platform) = Instagram. */
-const toPlatform = (v: string): PlatformId => (isPlatform(v) ? v : DEFAULT_PLATFORM)
-const toAccount = (v: string): AccountId => ((ACCOUNT_IDS as readonly string[]).includes(v) ? (v as AccountId) : DEFAULT_ACCOUNT)
+export const toPlatform = (v: string): PlatformId => (isPlatform(v) ? v : DEFAULT_PLATFORM)
+export const toAccount = (v: string): AccountId => ((ACCOUNT_IDS as readonly string[]).includes(v) ? (v as AccountId) : DEFAULT_ACCOUNT)
 /** Workbook lama tanpa kolom audience, atau JSON rusak = audiens kosong (data lain tetap terbaca). */
-const toAudience = (t: string): Audience => {
+export const toAudience = (t: string): Audience => {
   if (!t) return emptyAudience()
   try {
     const p = audienceSchema.safeParse(JSON.parse(t))
@@ -213,13 +213,16 @@ function toSheets(data: Data): Record<keyof typeof HEADERS, unknown[][]> {
   }
 }
 
+/** Penyimpanan data penuh pengganti Google Sheets/Excel (mis. MySQL, lihat server/mysql.ts). load() null = database masih kosong. */
+export interface DataBackend { label: string; load(): Promise<Data | null>; save(d: Data): Promise<void> }
+
 export interface Remote { url: string; token: string; fetch?: typeof fetch }
 /** Penyimpanan gambar pengganti folder thumbs (mis. Netlify Blobs), untuk hosting tanpa disk tetap. */
 export interface ThumbBackend { set(key: string, data: Buffer): Promise<void>; get(key: string): Promise<Buffer | null>; delete(key: string): Promise<void> }
 
-export function createStore(dir: string, remote?: Remote, blobs?: ThumbBackend) {
+export function createStore(dir: string, remote?: Remote, blobs?: ThumbBackend, db?: DataBackend) {
   const localFile = path.join(dir, FILE_NAME)
-  const file = remote ? 'Google Sheets' : localFile
+  const file = db ? db.label : remote ? 'Google Sheets' : localFile
   const thumbDir = path.join(dir, 'thumbs')
   let queue: Promise<unknown> = Promise.resolve()
   const serial = <T>(fn: () => Promise<T>): Promise<T> => {
@@ -322,17 +325,26 @@ export function createStore(dir: string, remote?: Remote, blobs?: ThumbBackend) 
     sent = { ...sent, ...Object.fromEntries(Object.keys(sheets).map((n) => [n, now[n]])) }
   }
 
+  async function readDb(): Promise<Data> {
+    const data = await db!.load()
+    if (data) return data
+    // Database masih kosong: impor workbook lokal bila ada, kalau tidak mulai dari data kosong.
+    const first = await fs.access(localFile).then(() => parse(localFile), () => emptyData())
+    await db!.save(first)
+    return (await db!.load()) ?? first
+  }
+
   // Pembacaan dashboard di-cache singkat agar tidak memukul Apps Script di setiap permintaan; mutate selalu membaca ulang.
-  const TTL = 10_000
+  const TTL = db ? 2_000 : 10_000
   let cache: { at: number; data: Data } | null = null
   let inflight: Promise<unknown> | null = null
-  const load = () => (remote ? readRemote() : readLocal())
-  const persist = (d: Data) => (remote ? writeRemote(d) : write(d))
+  const load = () => (db ? readDb() : remote ? readRemote() : readLocal())
+  const persist = (d: Data) => (db ? db.save(d) : remote ? writeRemote(d) : write(d))
   async function read(): Promise<Data> {
-    if (!remote) return readLocal()
+    if (!remote && !db) return readLocal()
     if (!cache || Date.now() - cache.at > TTL) {
       // Permintaan bersamaan berbagi satu pembacaan, supaya Apps Script tidak kebanjiran.
-      inflight ??= readRemote().then((data) => (cache = { at: Date.now(), data }), (e) => { throw e }).finally(() => { inflight = null })
+      inflight ??= load().then((data) => (cache = { at: Date.now(), data }), (e) => { throw e }).finally(() => { inflight = null })
       await inflight
     }
     return structuredClone(cache!.data)
@@ -353,7 +365,7 @@ export function createStore(dir: string, remote?: Remote, blobs?: ThumbBackend) 
     },
     /** File .xlsx untuk diunduh; dari Google Sheets dibuat sesaat dari data terbaru. */
     async exportFile() {
-      if (!remote) return (await readLocal(), localFile)
+      if (!remote && !db) return (await readLocal(), localFile)
       await fs.mkdir(dir, { recursive: true })
       const out = path.join(dir, 'export_google_sheets.xlsx')
       await build(await load(), out)

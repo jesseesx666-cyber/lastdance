@@ -6,12 +6,17 @@
   directory = "netlify/functions"
   node_bundler = "esbuild"
 
+# API berjalan di VPS (MySQL lokal, tidak terbuka ke internet) dan dipanggil lewat proxy.
+# Netlify hanya menyajikan tampilan; tidak perlu DATABASE_URL di sini.
+# Proxy: https://izinklinik.com/lastdance-api/ -> http://127.0.0.1:3990/api/
 [[redirects]]
   from = "/api/*"
-  to = "/.netlify/functions/api/:splat"
+  to = "https://izinklinik.com/lastdance-api/:splat"
   status = 200
+  force = true
 
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
+

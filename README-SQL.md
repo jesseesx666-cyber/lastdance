@@ -177,3 +177,41 @@ kontrak `Store` (read/mutate/exportFile + gambar) dipertahankan.
 - Password tetap `scrypt` + cookie HMAC; `password_hash` kini tersimpan di kolom `users.password_hash`
   (bukan di sheet yang bisa ikut terekspos bila spreadsheet dibagikan).
 - Sambungkan lewat SSL (`DATABASE_SSL=1`) saat database berada di luar jaringan lokal.
+
+---
+
+## 9. Deploy: Netlify (tampilan) + API di VPS
+
+Database tetap di VPS dan **tidak dibuka ke internet**. Netlify hanya menyajikan tampilan React,
+sedangkan semua panggilan `/api/*` diteruskan ke API di VPS:
+
+```
+Browser → Netlify (dist) ──/api/*──► https://izinklinik.com/lastdance-api/* ──► 127.0.0.1:3990/api/*
+                                                                               └─ MySQL lokal
+```
+
+Yang perlu ada di VPS:
+1. Aplikasi API berjalan dengan `pm2` (contoh nama proses `lastdance-api`, port 3990) dan `.env`
+   berisi `DATABASE_URL`, `SESSION_SECRET`, `DATA_DIR`, `PORT`.
+2. Nginx pada domain ber-SSL punya lokasi proxy:
+   ```nginx
+   location ^~ /lastdance-api/ {
+       proxy_pass http://127.0.0.1:3990/api/;
+       proxy_set_header Host 127.0.0.1:3990;   # lolos pemeriksaan anti DNS-rebinding aplikasi
+       proxy_set_header X-Forwarded-Proto $scheme;
+       proxy_read_timeout 60s;
+       client_max_body_size 20m;
+   }
+   ```
+
+Yang perlu ada di Netlify: **tidak ada environment variable**. Cukup `netlify.toml`:
+```toml
+[[redirects]]
+  from = "/api/*"
+  to = "https://izinklinik.com/lastdance-api/:splat"
+  status = 200
+  force = true
+```
+
+Catatan: gambar (thumbnail konten, grafik audiens) disimpan di `DATA_DIR/thumbs` pada VPS.
+Bila sebelumnya gambar berada di Netlify Blobs, unggah ulang lewat form atau salin file ke folder itu.
